@@ -1,0 +1,53 @@
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+from typing import List, Optional
+import logging
+from prometheus_fastapi_instrumentator import Instrumentator
+
+app = FastAPI(title="{{ service_name | title }} API")
+
+# Logging Setup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("{{ service_name }}")
+
+# DB Setup
+DATABASE_URL = "postgresql+asyncpg://user:pass@db/{{ service_name }}"
+engine = create_async_engine(DATABASE_URL, echo=True)
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+Base = declarative_base()
+
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
+# Metrics
+Instrumentator().instrument(app).expose(app)
+
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Service started")
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+{% for endpoint in endpoints %}
+{% if endpoint.request_schema %}
+class {{ endpoint.request_schema }}(BaseModel):
+    pass # TODO: Define fields
+{% endif %}
+class {{ endpoint.response_schema }}(BaseModel):
+    pass # TODO: Define fields
+
+@app.{{ endpoint.method | lower }}("{{ endpoint.path }}", response_model={{ endpoint.response_schema }})
+async def {{ endpoint.summary | lower | replace(' ', '_') }}({% if endpoint.request_schema %}payload: {{ endpoint.request_schema }}, {% endif %}db: AsyncSession = Depends(get_db)):
+    """
+    {{ endpoint.summary }}
+    """
+    # TODO: Implement business logic
+    return {{ endpoint.response_schema }}()
+{% endfor %}

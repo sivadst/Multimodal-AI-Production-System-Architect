@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+{% for service in services %}
+  {{ service.name }}:
+    build: 
+      context: ./{{ service.name }}
+    ports:
+      - "{{ 8000 + loop.index0 }}:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:pass@db_{{ service.name }}/{{ service.name }}
+    depends_on:
+      - db_{{ service.name }}
+
+  db_{{ service.name }}:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: {{ service.name }}
+{% endfor %}

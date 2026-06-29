@@ -1,0 +1,12 @@
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
+
+{% for table in models.tables %}
+class {{ table.name | title }}(Base):
+    __tablename__ = "{{ table.name }}"
+    {% for col in table.columns %}
+    {{ col.name }} = Column(String, primary_key={{ col.is_primary_key }}, nullable={{ col.is_nullable }})
+    {% endfor %}
+{% endfor %}

@@ -1,0 +1,37 @@
+provider "aws" {
+  region = "us-west-2"
+}
+
+# Example VPC and ECS cluster generation based on design
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+
+resource "aws_ecs_cluster" "cluster" {
+  name = "arch-mind-cluster"
+}
+
+{% for service in design.services %}
+resource "aws_ecs_service" "{{ service.name }}" {
+  name            = "{{ service.name }}"
+  cluster         = aws_ecs_cluster.cluster.id
+  task_definition = aws_ecs_task_definition.{{ service.name }}.arn
+  desired_count   = 2
+}
+
+resource "aws_ecs_task_definition" "{{ service.name }}" {
+  family = "{{ service.name }}"
+  container_definitions = jsonencode([{
+    name  = "{{ service.name }}"
+    image = "{{ service.name }}:latest"
+    portMappings = [{
+      containerPort = 8000
+      hostPort      = 8000
+    }]
+  }])
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 256
+  memory                   = 512
+}
+{% endfor %}
